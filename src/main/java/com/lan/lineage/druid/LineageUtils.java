@@ -40,17 +40,17 @@ import java.util.concurrent.atomic.AtomicReference;
 public class LineageUtils {
 
 
-    public static void columnLineageAnalyzer(String sql,TreeNode<LineageColumn> node) {
-        if ( EmptyUtils.isEmpty(sql)){
+    public static void columnLineageAnalyzer(String sql, TreeNode<LineageColumn> node) {
+        if (EmptyUtils.isEmpty(sql)) {
             return;
         }
         AtomicReference<Boolean> isContinue = new AtomicReference<>(false);
         List<SQLStatement> statements = new ArrayList<>();
         // 解析
-        try{
+        try {
             statements = SQLUtils.parseStatements(sql, JdbcConstants.MYSQL);
-        }catch (Exception e){
-            System.out.println("can't parser by druid MYSQL"+e);
+        } catch (Exception e) {
+            System.out.println("can't parser by druid MYSQL" + e);
         }
         // 只考虑一条语句
         SQLStatement statement = statements.get(0);
@@ -66,10 +66,10 @@ public class LineageUtils {
                 // 处理---------------------
                 String column = EmptyUtils.isEmpty(x.getAlias()) ? x.toString() : x.getAlias();
 
-                if (column.contains(".")){
-                    column = column.substring(column.indexOf(".")+1);
+                if (column.contains(".")) {
+                    column = column.substring(column.indexOf(".") + 1);
                 }
-                column = column.replace("`","");
+                column = column.replace("`", "");
 
                 String expr = x.getExpr().toString();
                 LineageColumn myColumn = new LineageColumn();
@@ -79,15 +79,15 @@ public class LineageUtils {
                 TreeNode<LineageColumn> itemNode = new TreeNode<>(myColumn);
                 SQLExpr expr1 = x.getExpr();
                 //解析表达式，添加解析结果子节点
-                handlerExpr(expr1,itemNode);
+                handlerExpr(expr1, itemNode);
 
-                if (node.getLevel() == 0 || node.getData().getTargetColumnName().equals(column) ){
+                if (node.getLevel() == 0 || node.getData().getTargetColumnName().equals(column)) {
                     node.addChild(itemNode);
                     isContinue.set(true);
                 }
 
             });
-            if (isContinue.get()){
+            if (isContinue.get()) {
                 // 获取表
                 SQLTableSource table = sqlSelectQueryBlock.getFrom();
                 // 普通单表
@@ -103,7 +103,7 @@ public class LineageUtils {
                     // 处理 subquery ---------------------
                     handlerSQLSubqueryTableSource(node, table);
 
-                }else if (table instanceof SQLUnionQueryTableSource) {
+                } else if (table instanceof SQLUnionQueryTableSource) {
                     // 处理 union ---------------------
                     handlerSQLUnionQueryTableSource(node, (SQLUnionQueryTableSource) table);
                 }
@@ -114,30 +114,32 @@ public class LineageUtils {
             // union的查询语句
         } else if (sqlSelectQuery instanceof SQLUnionQuery) {
             // 处理---------------------
-            columnLineageAnalyzer(((SQLUnionQuery) sqlSelectQuery).getLeft().toString(),node);
-            columnLineageAnalyzer(((SQLUnionQuery) sqlSelectQuery).getRight().toString(),node);
+            columnLineageAnalyzer(((SQLUnionQuery) sqlSelectQuery).getLeft().toString(), node);
+            columnLineageAnalyzer(((SQLUnionQuery) sqlSelectQuery).getRight().toString(), node);
 
         }
     }
 
     /**
      * 处理UNION子句
+     *
      * @param node
      * @param table
      */
     private static void handlerSQLUnionQueryTableSource(TreeNode<LineageColumn> node, SQLUnionQueryTableSource table) {
-        node.getAllLeafs().stream().filter(e -> !e.getData().getIsEnd()).forEach(e->{
+        node.getAllLeafs().stream().filter(e -> !e.getData().getIsEnd()).forEach(e -> {
             columnLineageAnalyzer(table.getUnion().toString(), e);
         });
     }
 
     /**
      * 处理sub子句
+     *
      * @param node
      * @param table
      */
     private static void handlerSQLSubqueryTableSource(TreeNode<LineageColumn> node, SQLTableSource table) {
-        node.getAllLeafs().stream().filter(e -> !e.getData().getIsEnd()).forEach(e->{
+        node.getAllLeafs().stream().filter(e -> !e.getData().getIsEnd()).forEach(e -> {
             columnLineageAnalyzer(table.toString(), e);
         });
     }
@@ -145,38 +147,37 @@ public class LineageUtils {
 
     /**
      * 处理JOIN
+     *
      * @param node
      * @param table
      */
-    private static void handlerSQLJoinTableSource(TreeNode<LineageColumn> node,SQLJoinTableSource table){
+    private static void handlerSQLJoinTableSource(TreeNode<LineageColumn> node, SQLJoinTableSource table) {
         // 处理---------------------
         // 子查询作为表
-        node.getAllLeafs().stream().filter(e -> !e.getData().getIsEnd()).forEach(e->{
-            if (table.getLeft() instanceof SQLJoinTableSource ){
+        node.getAllLeafs().stream().filter(e -> !e.getData().getIsEnd()).forEach(e -> {
+            if (table.getLeft() instanceof SQLJoinTableSource) {
                 handlerSQLJoinTableSource(node, (SQLJoinTableSource) table.getLeft());
-            }else if (table.getLeft() instanceof  SQLExprTableSource){
+            } else if (table.getLeft() instanceof SQLExprTableSource) {
                 handlerSQLExprTableSource(node, (SQLExprTableSource) table.getLeft());
-            }else if (table.getLeft() instanceof SQLSubqueryTableSource) {
+            } else if (table.getLeft() instanceof SQLSubqueryTableSource) {
                 // 处理---------------------
                 handlerSQLSubqueryTableSource(node, table.getLeft());
-            }
-            else if (table.getLeft() instanceof SQLUnionQueryTableSource) {
+            } else if (table.getLeft() instanceof SQLUnionQueryTableSource) {
                 // 处理---------------------
                 handlerSQLUnionQueryTableSource(node, (SQLUnionQueryTableSource) table.getLeft());
             }
         });
 
 
-        node.getAllLeafs().stream().filter(e -> !e.getData().getIsEnd()).forEach(e->{
-            if (table.getRight() instanceof SQLJoinTableSource ){
+        node.getAllLeafs().stream().filter(e -> !e.getData().getIsEnd()).forEach(e -> {
+            if (table.getRight() instanceof SQLJoinTableSource) {
                 handlerSQLJoinTableSource(node, (SQLJoinTableSource) table.getRight());
-            }else if (table.getRight() instanceof  SQLExprTableSource){
+            } else if (table.getRight() instanceof SQLExprTableSource) {
                 handlerSQLExprTableSource(node, (SQLExprTableSource) table.getRight());
-            }else if (table.getRight() instanceof SQLSubqueryTableSource) {
+            } else if (table.getRight() instanceof SQLSubqueryTableSource) {
                 // 处理---------------------
                 handlerSQLSubqueryTableSource(node, table.getRight());
-            }
-            else if (table.getRight() instanceof SQLUnionQueryTableSource) {
+            } else if (table.getRight() instanceof SQLUnionQueryTableSource) {
                 // 处理---------------------
                 handlerSQLUnionQueryTableSource(node, (SQLUnionQueryTableSource) table.getRight());
             }
@@ -195,80 +196,86 @@ public class LineageUtils {
         String tableName = tableSource.getExpr() instanceof SQLPropertyExpr ? ((SQLPropertyExpr) tableSource.getExpr()).getName().replace("`","") : "";
         String alias = EmptyUtils.isNotEmpty(tableSource.getAlias()) ? tableSource.getAlias().replace("`","") : "";
 
-        node.getChildren().forEach(e->{
-            e.getChildren().forEach(f->{
-                if (EmptyUtils.isNotEmpty(db)){
-                    f.getData().setSourceDbName(db);
-                }
-                if (f.getData().getSourceTableName() == null || f.getData().getSourceTableName().equals(tableName) || f.getData().getSourceTableName().equals(alias)){
-                    f.getData().setSourceTableName(tableSource.toString());
-                    f.getData().setIsEnd(true);
-                    f.getData().setExpression(e.getData().getExpression());
-                }
-            });
+    node.getChildren().forEach(e -> {
+        e.getChildren().forEach(f -> {
+            LineageColumn fData = f.getData();
+            if (EmptyUtils.isNotEmpty(db)) {
+                fData.setSourceDbName(db);
+            }
 
+            String sourceTableName = fData.getSourceTableName();
+            if (sourceTableName == null || sourceTableName.equals(tableName) || sourceTableName.equals(alias)) {
+                fData.setSourceTableName(tableSource.toString());
+                fData.setIsEnd(true);
+                fData.setExpression(e.getData().getExpression());
+            }
         });
-    }
+    });
+
+
+}
 
     /**
      * 处理表达式
+     *
      * @param sqlExpr
      * @param itemNode
      */
-    private static void handlerExpr(SQLExpr sqlExpr,TreeNode<LineageColumn> itemNode) {
+    private static void handlerExpr(SQLExpr sqlExpr, TreeNode<LineageColumn> itemNode) {
         //方法
-        if (sqlExpr instanceof SQLMethodInvokeExpr){
-            visitSQLMethodInvoke( (SQLMethodInvokeExpr) sqlExpr,itemNode);
+        if (sqlExpr instanceof SQLMethodInvokeExpr) {
+            visitSQLMethodInvoke((SQLMethodInvokeExpr) sqlExpr, itemNode);
         }
         //聚合
-        else if (sqlExpr instanceof SQLAggregateExpr){
-            visitSQLAggregateExpr((SQLAggregateExpr) sqlExpr,itemNode);
+        else if (sqlExpr instanceof SQLAggregateExpr) {
+            visitSQLAggregateExpr((SQLAggregateExpr) sqlExpr, itemNode);
         }
         //case
-        else if (sqlExpr instanceof SQLCaseExpr){
-            visitSQLCaseExpr((SQLCaseExpr) sqlExpr,itemNode);
+        else if (sqlExpr instanceof SQLCaseExpr) {
+            visitSQLCaseExpr((SQLCaseExpr) sqlExpr, itemNode);
         }
         //比较
-        else if (sqlExpr instanceof SQLBinaryOpExpr){
-            visitSQLBinaryOpExpr((SQLBinaryOpExpr) sqlExpr,itemNode);
+        else if (sqlExpr instanceof SQLBinaryOpExpr) {
+            visitSQLBinaryOpExpr((SQLBinaryOpExpr) sqlExpr, itemNode);
         }
         //表达式
-        else if (sqlExpr instanceof SQLPropertyExpr){
-            visitSQLPropertyExpr((SQLPropertyExpr) sqlExpr,itemNode);
+        else if (sqlExpr instanceof SQLPropertyExpr) {
+            visitSQLPropertyExpr((SQLPropertyExpr) sqlExpr, itemNode);
         }
         //列
-        else if (sqlExpr instanceof SQLIdentifierExpr){
-            visitSQLIdentifierExpr((SQLIdentifierExpr) sqlExpr,itemNode);
+        else if (sqlExpr instanceof SQLIdentifierExpr) {
+            visitSQLIdentifierExpr((SQLIdentifierExpr) sqlExpr, itemNode);
         }
         //赋值表达式
-        else if (sqlExpr instanceof SQLIntegerExpr){
-            visitSQLIntegerExpr((SQLIntegerExpr) sqlExpr,itemNode);
+        else if (sqlExpr instanceof SQLIntegerExpr) {
+            visitSQLIntegerExpr((SQLIntegerExpr) sqlExpr, itemNode);
         }
         //数字
-        else if (sqlExpr instanceof SQLNumberExpr){
-            visitSQLNumberExpr((SQLNumberExpr) sqlExpr,itemNode);
+        else if (sqlExpr instanceof SQLNumberExpr) {
+            visitSQLNumberExpr((SQLNumberExpr) sqlExpr, itemNode);
         }
         //字符
-        else if (sqlExpr instanceof SQLCharExpr){
-            visitSQLCharExpr((SQLCharExpr) sqlExpr,itemNode);
+        else if (sqlExpr instanceof SQLCharExpr) {
+            visitSQLCharExpr((SQLCharExpr) sqlExpr, itemNode);
         }
     }
 
 
     /**
      * 方法
+     *
      * @param expr
      * @param node
      */
-    public static void visitSQLMethodInvoke(SQLMethodInvokeExpr expr,TreeNode<LineageColumn> node){
-        if (expr.getParameters().size() == 0){
+    public static void visitSQLMethodInvoke(SQLMethodInvokeExpr expr, TreeNode<LineageColumn> node) {
+        if (expr.getParameters().size() == 0) {
             //计算表达式，没有更多列，结束循环
-            if (node.getData().getExpression().equals(expr.toString())){
+            if (node.getData().getExpression().equals(expr.toString())) {
                 node.getData().setIsEnd(true);
             }
-        }else {
-            expr.getParameters().forEach( expr1 -> {
-                handlerExpr(expr1,node);
+        } else {
+            expr.getParameters().forEach(expr1 -> {
+                handlerExpr(expr1, node);
             });
         }
     }
@@ -276,24 +283,26 @@ public class LineageUtils {
 
     /**
      * 聚合
+     *
      * @param expr
      * @param node
      */
-    public static void visitSQLAggregateExpr(SQLAggregateExpr expr,TreeNode<LineageColumn> node){
-        expr.getArguments().forEach( expr1 -> {
-            handlerExpr(expr1,node);
+    public static void visitSQLAggregateExpr(SQLAggregateExpr expr, TreeNode<LineageColumn> node) {
+        expr.getArguments().forEach(expr1 -> {
+            handlerExpr(expr1, node);
         });
     }
 
 
     /**
      * 选择
+     *
      * @param expr
      * @param node
      */
-    public static void visitSQLCaseExpr(SQLCaseExpr expr,TreeNode<LineageColumn> node){
-        expr.getItems().forEach( expr1 -> {
-            handlerExpr(expr1.getConditionExpr(),node);
+    public static void visitSQLCaseExpr(SQLCaseExpr expr, TreeNode<LineageColumn> node) {
+        expr.getItems().forEach(expr1 -> {
+            handlerExpr(expr1.getConditionExpr(), node);
 
         });
     }
@@ -301,46 +310,47 @@ public class LineageUtils {
 
     /**
      * 判断
+     *
      * @param expr
      * @param node
      */
-    public static void visitSQLBinaryOpExpr(SQLBinaryOpExpr expr,TreeNode<LineageColumn> node){
-        handlerExpr(expr.getLeft(),node);
-        handlerExpr(expr.getRight(),node);
+    public static void visitSQLBinaryOpExpr(SQLBinaryOpExpr expr, TreeNode<LineageColumn> node) {
+        handlerExpr(expr.getLeft(), node);
+        handlerExpr(expr.getRight(), node);
     }
-
-
 
 
     /**
      * 表达式列
+     *
      * @param expr
      * @param node
      */
-    public static void visitSQLPropertyExpr(SQLPropertyExpr expr,TreeNode<LineageColumn>  node){
+    public static void visitSQLPropertyExpr(SQLPropertyExpr expr, TreeNode<LineageColumn> node) {
         LineageColumn project = new LineageColumn();
-        String columnName = expr.getName().replace("`","");
+        String columnName = expr.getName().replace("`", "");
         project.setTargetColumnName(columnName);
 
         project.setSourceTableName(expr.getOwner().toString());
-        TreeNode<LineageColumn> search =  node.findChildNode(project);
+        TreeNode<LineageColumn> search = node.findChildNode(project);
 
-        if (EmptyUtils.isEmpty(search)){
+        if (EmptyUtils.isEmpty(search)) {
             node.addChild(project);
         }
     }
 
     /**
      * 列
+     *
      * @param expr
      * @param node
      */
-    public static void visitSQLIdentifierExpr(SQLIdentifierExpr expr,TreeNode<LineageColumn>  node){
+    public static void visitSQLIdentifierExpr(SQLIdentifierExpr expr, TreeNode<LineageColumn> node) {
         LineageColumn project = new LineageColumn();
         project.setTargetColumnName(expr.getName());
 
-        TreeNode<LineageColumn> search =  node.findChildNode(project);
-        if (EmptyUtils.isEmpty(search)){
+        TreeNode<LineageColumn> search = node.findChildNode(project);
+        if (EmptyUtils.isEmpty(search)) {
             node.addChild(project);
         }
     }
@@ -348,34 +358,36 @@ public class LineageUtils {
 
     /**
      * 整型赋值
+     *
      * @param expr
      * @param node
      */
-    public static void visitSQLIntegerExpr(SQLIntegerExpr expr,TreeNode<LineageColumn>  node){
+    public static void visitSQLIntegerExpr(SQLIntegerExpr expr, TreeNode<LineageColumn> node) {
         LineageColumn project = new LineageColumn();
         project.setTargetColumnName(expr.getNumber().toString());
         //常量不设置表信息
         project.setSourceTableName("");
         project.setIsEnd(true);
-        TreeNode<LineageColumn> search =  node.findChildNode(project);
-        if (EmptyUtils.isEmpty(search)){
+        TreeNode<LineageColumn> search = node.findChildNode(project);
+        if (EmptyUtils.isEmpty(search)) {
             node.addChild(project);
         }
     }
 
     /**
      * 数字
+     *
      * @param expr
      * @param node
      */
-    public static void visitSQLNumberExpr(SQLNumberExpr expr, TreeNode<LineageColumn>  node){
+    public static void visitSQLNumberExpr(SQLNumberExpr expr, TreeNode<LineageColumn> node) {
         LineageColumn project = new LineageColumn();
         project.setTargetColumnName(expr.getNumber().toString());
         //常量不设置表信息
         project.setSourceTableName("");
         project.setIsEnd(true);
-        TreeNode<LineageColumn> search =  node.findChildNode(project);
-        if (EmptyUtils.isEmpty(search)){
+        TreeNode<LineageColumn> search = node.findChildNode(project);
+        if (EmptyUtils.isEmpty(search)) {
             node.addChild(project);
         }
     }
@@ -383,17 +395,18 @@ public class LineageUtils {
 
     /**
      * 字符
+     *
      * @param expr
      * @param node
      */
-    public static void visitSQLCharExpr(SQLCharExpr expr, TreeNode<LineageColumn>  node){
+    public static void visitSQLCharExpr(SQLCharExpr expr, TreeNode<LineageColumn> node) {
         LineageColumn project = new LineageColumn();
         project.setTargetColumnName(expr.toString());
         //常量不设置表信息
         project.setSourceTableName("");
         project.setIsEnd(true);
-        TreeNode<LineageColumn> search =  node.findChildNode(project);
-        if (EmptyUtils.isEmpty(search)){
+        TreeNode<LineageColumn> search = node.findChildNode(project);
+        if (EmptyUtils.isEmpty(search)) {
             node.addChild(project);
         }
     }
